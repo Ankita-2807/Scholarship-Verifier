@@ -1,0 +1,9 @@
+{
+  "scheme": "Merit Scholarship (DEMO - replace with official criteria)",
+  "min_age": 17,
+  "max_age": 25,
+  "min_percentage": 75,
+  "max_family_income": 800000,
+  "required_docs": ["aadhaar", "marksheet", "income_certificate"],
+  "income_certificate_max_age_days": 365
+}
