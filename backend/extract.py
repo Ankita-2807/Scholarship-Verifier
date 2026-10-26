@@ -43,24 +43,31 @@ def find_date(lines):
     return None
 
 def money(token):
-    # "4,20,000"  "4.20.000"  "420000.00"  ->  420000
+    # "4,20,000"  "420 000"  "4.20.000"  "420000.00"  ->  420000
+    token = token.replace("O", "0").replace("o", "0")               # 420,OOO -> 420,000
     token = re.sub(r"\.0{1,2}$", "", token.strip(".,"))
-    digits = re.sub(r"[.,]", "", token)
+    digits = re.sub(r"[.,\s]", "", token)
     return int(digits) if digits.isdigit() else None
 
-AMOUNT = r"(\d[\d,.]*)"
+# an amount: digits and commas, plus a possible extra group of 3 digits after a space ("420 000")
+AMOUNT = r"(\d[\d,.Oo]*(?:\s*[,.]?\s*[\dOo]{3}(?![\dOo]))*)"
+
+def amount_from(lines, i, token):
+    # The amount may be split over two lines: "420" here and ",000" on the next line
+    nxt = lines[i + 1] if i + 1 < len(lines) else ""
+    if not re.search(r",[\dOo]{3}$", token) and re.fullmatch(r"\s*[,.]?\s*[\dOo]{3}\s*", nxt):
+        token = token + nxt.strip()
+    return money(token)
 
 def find_income(lines):
-    # 1) normal label: "Annual Income: Rs. 4,20,000"
-    val = after_label(lines, r"annual\s+income")
-    m = re.search(AMOUNT, val) if val else None
-    if m and money(m.group(1)):
-        return money(m.group(1))
-    # 2) any line with Rs / INR / rupee sign followed by an amount
-    for ln in lines:
-        m = re.search(r"(?:rs|inr|\u20b9)\.?\s*[:\-]?\s*" + AMOUNT, ln, re.I)
-        if m and money(m.group(1)):
-            return money(m.group(1))
+    # 1) the label "Annual Income" (then maybe Rs) followed by an amount,
+    # 2) or any line with Rs / INR / rupee sign followed by an amount
+    for pattern in (r"annual\s+income\s*[:\-]?\s*(?:rs|inr|\u20b9)?\.?\s*",
+                    r"(?:rs|inr|\u20b9)\.?\s*[:\-]?\s*"):
+        for i, ln in enumerate(lines):
+            m = re.search(pattern + AMOUNT, ln, re.I)
+            if m and money(m.group(1)):
+                return amount_from(lines, i, m.group(1))
     # 3) a line that mentions income / annual (even if misread) and has a number,
     #    or the number is on the next line
     for i, ln in enumerate(lines):
@@ -68,14 +75,39 @@ def find_income(lines):
             for cand in (ln, lines[i + 1] if i + 1 < len(lines) else ""):
                 if "/" in cand:
                     continue                 # skip dates
-                m = re.search(r"(?<![\d,.])(\d[\d,.]{3,})", cand)
+                m = re.search(r"(?<![\d,.])(\d[\d,.Oo]{3,})", cand)
                 if m and money(m.group(1)):
                     return money(m.group(1))
     return None
 
+DEVANAGARI = {ord("\u0966") + i: str(i) for i in range(10)}      # Hindi digits 0-9 -> 0-9
+
 def clean_lines(lines):
-    # The Hindi model sometimes reads ":" as the Devanagari sign "\u0903" - turn it back into ":"
-    return [ln.replace("\u0903", ":").replace("\uff1a", ":") for ln in lines]
+    out = []
+    for ln in lines:
+        ln = ln.replace("\u0903", ":").replace("\uff1a", ":")       # Hindi ":" sign -> ":"
+        ln = ln.translate(DEVANAGARI)                                  # Hindi digits -> 0-9
+        ln = re.sub(r"(?<=\d)[Oo]|[Oo](?=\d)", "0", ln)              # 5O0 -> 500
+        ln = re.sub(r"(?<=\d)[lI]|[lI](?=\d)", "1", ln)              # l4/03 -> 14/03
+        out.append(ln)
+    return out
+
+def find_marks(lines):
+    # 1) label "Marks Obtained" (OCR may change the spaces or misread a letter)
+    val = after_label(lines, r"marks\s*[o0]bt\w*")
+    if val and to_num(val) is not None:
+        return to_num(val)
+    # 2) any line with the word "marks" (not the total line) that has a number,
+    #    or a line that is only a number right below it
+    for i, ln in enumerate(lines):
+        if re.search(r"\bmarks\b|\bob\w+", ln, re.I) and not re.search(r"total|percent", ln, re.I):
+            m = re.search(r"\d+", ln)
+            if m:
+                return int(m.group(0))
+            nxt = lines[i + 1] if i + 1 < len(lines) else ""
+            if re.fullmatch(r"\s*\d+\s*", nxt):
+                return int(nxt)
+    return None
 
 def parse(lines):
     lines = clean_lines(lines)
@@ -99,7 +131,7 @@ def parse(lines):
         "name": after_label(lines, r"(?:student\s+)?name"),
         "dob": dob,
         "id_number": find_aadhaar(lines),
-        "marks": to_num(after_label(lines, r"marks obtained")),
+        "marks": find_marks(lines),
         "total": to_num(after_label(lines, r"total marks")),
         "percentage": percentage,
         "income": find_income(lines) if doc_type == "income_certificate" else None,
