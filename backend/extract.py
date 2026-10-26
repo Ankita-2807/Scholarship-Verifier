@@ -26,11 +26,22 @@ def to_num(s):
     return float(n) if "." in n else int(n)
 
 def find_aadhaar(lines):
-    # Look at each line separately so DOB digits do not get mixed in
+    # 1) all 12 digits on one line (DOB digits stay out because of the lookarounds)
     for ln in lines:
         m = re.search(r"(?<![\d/])(\d{4})\s?(\d{4})\s?(\d{4})(?![\d/])", ln)
         if m:
             return "".join(m.groups())
+    # 2) OCR split the number over 2-3 lines: "2345" / "6789" / "0123"
+    for i in range(len(lines)):
+        digits = ""
+        for ln in lines[i:i + 3]:
+            if not re.fullmatch(r"[\d\s]+", ln):     # only digit/space lines (skips dates, names)
+                break
+            digits += re.sub(r"\s", "", ln)
+            if len(digits) == 12:
+                return digits
+            if len(digits) > 12:
+                break
     return None
 
 def find_date(lines):
