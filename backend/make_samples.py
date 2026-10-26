@@ -63,7 +63,7 @@ def make_case(folder, name, marksheet_name, age, first11,
     os.makedirs(os.path.join(OUT, folder), exist_ok=True)
     today = date.today()
     dob = dstr(today.replace(year=today.year - age) - timedelta(days=30))
-    number = generate(first11)
+    number = first11 + generate(first11)[-1]
     spaced = f"{number[:4]} {number[4:8]} {number[8:]}"
     issue = dstr(today - timedelta(days=cert_days_old))
     docs = {
