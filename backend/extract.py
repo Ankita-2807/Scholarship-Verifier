@@ -53,10 +53,13 @@ def money(token):
 AMOUNT = r"(\d[\d,.Oo]*(?:\s*[,.]?\s*[\dOo]{3}(?![\dOo]))*)"
 
 def amount_from(lines, i, token):
-    # The amount may be split over two lines: "420" here and ",000" on the next line
+    # The amount may be split over two lines: "420" here and ",000" (or ",000/-") on the next line
     nxt = lines[i + 1] if i + 1 < len(lines) else ""
-    if not re.search(r",[\dOo]{3}$", token) and re.fullmatch(r"\s*[,.]?\s*[\dOo]{3}\s*", nxt):
-        token = token + nxt.strip()
+    short = len(re.sub(r"\D", "", token)) <= 3          # join only if the first part is short
+    if short:
+        m = re.match(r"\s*[,.]?\s*([\dOo]{3})(?![\dOo])", nxt)
+        if m:
+            token = token.strip(".,") + "," + m.group(1)
     return money(token)
 
 def find_income(lines):
