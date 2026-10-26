@@ -1,0 +1,23 @@
+{
+  "aadhaar": [
+    "Government of India - Aadhaar",
+    "Name: Rahul Sharma",
+    "DOB: 26/09/2005",
+    "4  "
+  ],
+  "marksheet": [
+    "State Board of Education",
+    "Class 12 Marksheet",
+    "Student Name: Rahul Sharma",
+    "Marks Obtained: 430",
+    "Total Marks: 500",
+    "Percentage: 86.0%"
+  ],
+  "income_certificate": [
+    "Income Certificate",
+    "Name: Rahul Sharma",
+    "Annual Income: Rs. 420,000",
+    "Issue Date: 28/06/2026",
+    "Issuing Authority: Tehsildar"
+  ]
+}
